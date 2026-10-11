@@ -6,6 +6,13 @@ segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Plugin: preservar correções na linha beta e compatibilidade do runtime
+
+- Reaplicada à linha `release/2.0.10-beta-4` a correção do fechamento duplicado de descritor e a preservação de `XAUTHORITY` do PR #341, já incorporadas na `main`. O ZIP publicado da beta-4 ainda contém o fechamento duplicado; não substituir a instalação local corrigida por esse artefato.
+- Notificações do plugin usam os tipos atuais de `showToast`, sem acessar `Toasts.Type`/`Toasts.Position` ausentes no Equicord atual. Erros de reinício continuam visíveis.
+- A ponte Proton preserva o resultado estruturado do CAPTCHA, inclusive cancelamento; corrigidos os tipos do seletor de arquivos, do status `managedConflict` e das opções de `execFile` assíncrono.
+- Regressões executam o código do lock, notificações, CAPTCHA e ambiente do helper. As alterações são do plugin: GUI e standalone não foram modificados. Não houve publicação nem troca de canal, nem validação ao vivo de Windows ou da beta corrigida.
+
 ## [2.0.10-beta-4] - 2026-10-11
 
 ### Windows: "Iniciar com o Windows" desliga de verdade
