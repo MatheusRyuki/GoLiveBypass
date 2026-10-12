@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from "async_hooks";
 import { RendererSettings } from "@main/settings";
 import { execFile, execFileSync, spawn } from "child_process";
 import { createHash, randomUUID } from "crypto";
-import { app, BrowserWindow, dialog, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, type IpcMainEvent, type IpcMainInvokeEvent, type OpenDialogOptions } from "electron";
 import {
     appendFileSync,
     closeSync,
@@ -329,7 +329,6 @@ type PluginUpdateFlight<T> = {
 };
 
 type PluginUpdateLock = {
-    fd: number;
     token: string;
     depth: number;
 };
@@ -512,6 +511,7 @@ async function requestRelaunch(namespace: string | null): Promise<boolean> {
     const safeEnvKeys = [
         "WAYLAND_DISPLAY",
         "DISPLAY",
+        "XAUTHORITY",
         "XDG_BACKEND",
         "XDG_SESSION_TYPE",
         "GDK_BACKEND",
@@ -1242,9 +1242,9 @@ export function importWireGuardConfig(_: IpcMainInvokeEvent, sourcePath: unknown
 export async function selectWireGuardConfig(event: IpcMainInvokeEvent) {
     try {
         const parent = BrowserWindow.fromWebContents(event.sender);
-        const options = {
+        const options: OpenDialogOptions = {
             title: "Selecionar configuração WireGuard",
-            properties: ["openFile"] as const,
+            properties: ["openFile"],
             filters: [{ name: "Configuração WireGuard", extensions: ["conf"] }],
         };
         const selected = parent
@@ -1283,7 +1283,7 @@ export async function loginProton(event: IpcMainInvokeEvent, value: unknown) {
         try {
             const payload = cleanLoginPayload(value);
             const parent = BrowserWindow.fromWebContents(event.sender);
-            const result = await controller.loginProton(payload, (url, signal) => solveCaptcha(url, parent, signal).then(captcha => captcha.ok ? captcha.token : null));
+            const result = await controller.loginProton(payload, (url, signal) => solveCaptcha(url, parent, signal));
             if (result.success && result.username) setStoredUsername(result.username);
             return result;
         } catch (error) {
@@ -1596,7 +1596,7 @@ function acquirePluginUpdateLock(): PluginUpdateLock {
         try {
             fd = openSync(path, "wx", 0o600);
             created = true;
-            const lock: PluginUpdateLock = { fd, token: randomUUID(), depth: 1 };
+            const lock: PluginUpdateLock = { token: randomUUID(), depth: 1 };
             writeFileSync(fd, `${JSON.stringify({ pid: process.pid, token: lock.token, startedAt: Date.now() })}\n`, "utf8");
             // O lock é consultado por outro processo. Garanta que o owner foi
             // escrito antes de liberar o descritor, especialmente no Windows.
@@ -1645,7 +1645,8 @@ function releasePluginUpdateLock(lock: PluginUpdateLock | null | undefined): voi
     let ownsFile = false;
     const owner = readUpdateLockOwner(updateLockPath());
     ownsFile = owner?.pid === process.pid && owner.token === lock.token;
-    try { closeSync(lock.fd); } catch { /* o descritor pode já estar fechado */ }
+    // O descritor foi fechado na aquisição; seu número pode ter sido reutilizado
+    // pelo Discord. Liberar o lock nunca deve fechar esse número novamente.
     if (ownsFile) {
         try { rmSync(updateLockPath(), { force: true }); }
         catch (error) { log("warn", "não consegui liberar o lock do updater", { erro: error }); }
